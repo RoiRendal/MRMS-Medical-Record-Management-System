@@ -1,14 +1,10 @@
 const adapterClient = require('../clients/adapterClient');
+const { requireFields, requireMongoObjectId } = require('../utils/validators');
 
 async function createPatientProfile(req, res, next) {
   try {
+    requireFields(req.body, ['name', 'birthdate', 'address', 'phone']);
     const { name, birthdate, address, phone } = req.body;
-    if (!name || !birthdate || !address || !phone) {
-      const err = new Error('name, birthdate, address, and phone are required');
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
 
     const patient = await adapterClient.createPatientProfile(
       { name, birthdate, address, phone },
@@ -32,12 +28,7 @@ async function getAllPatients(req, res, next) {
 async function getPatientRecordsById(req, res, next) {
   try {
     const { patientId } = req.params;
-    if (!patientId) {
-      const err = new Error('patientId is required');
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
+    requireMongoObjectId(patientId, 'patientId');
 
     const records = await adapterClient.getPatientRecords(patientId, req.token);
     res.status(200).json(records);

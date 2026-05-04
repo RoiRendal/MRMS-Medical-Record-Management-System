@@ -1,4 +1,5 @@
 const authClient = require('../clients/authClient');
+const { requireFields } = require('../utils/validators');
 
 function buildCreateAccountPayload(body, role, createdByUserId) {
   return {
@@ -12,13 +13,7 @@ function buildCreateAccountPayload(body, role, createdByUserId) {
 
 async function createDoctorAccount(req, res, next) {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      const err = new Error('username and password are required');
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
+    requireFields(req.body, ['username', 'password']);
 
     const account = await authClient.createUserAccount(
       buildCreateAccountPayload(req.body, 'doctor', req.user.id)
@@ -32,13 +27,7 @@ async function createDoctorAccount(req, res, next) {
 
 async function createPatientAccount(req, res, next) {
   try {
-    const { username, password } = req.body;
-    if (!username || !password) {
-      const err = new Error('username and password are required');
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
+    requireFields(req.body, ['username', 'password']);
 
     const account = await authClient.createUserAccount(
       buildCreateAccountPayload(req.body, 'patient', req.user.id)

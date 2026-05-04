@@ -1,17 +1,15 @@
 const Doctor = require('../models/doctor');
+const {
+  requireFields,
+  requireMongoObjectId,
+  validateAvailability,
+} = require('../utils/validators');
 
 async function createDoctor(req, res, next) {
   try {
     const { firstName, lastName, specialization, phone, email, availability } = req.body;
-
-    if (!firstName || !lastName || !specialization || !phone || !email) {
-      const err = new Error(
-        'firstName, lastName, specialization, phone, and email are required'
-      );
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
+    requireFields(req.body, ['firstName', 'lastName', 'specialization', 'phone', 'email']);
+    validateAvailability(availability);
 
     const doctor = await Doctor.create({
       firstName,
@@ -40,6 +38,7 @@ async function getAllDoctors(req, res, next) {
 async function getDoctorById(req, res, next) {
   try {
     const { doctorId } = req.params;
+    requireMongoObjectId(doctorId, 'doctorId');
     const doctor = await Doctor.findById(doctorId);
 
     if (!doctor) {

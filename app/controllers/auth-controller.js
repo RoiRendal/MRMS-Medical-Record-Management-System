@@ -1,14 +1,10 @@
 const authClient = require('../clients/authClient');
+const { requireFields } = require('../utils/validators');
 
 async function login(req, res, next) {
   try {
+    requireFields(req.body, ['username', 'password']);
     const { username, password } = req.body;
-    if (!username || !password) {
-      const err = new Error('username and password are required');
-      err.status = 400;
-      err.expose = true;
-      throw err;
-    }
 
     const data = await authClient.login({ username, password });
     res.status(200).json(data);
