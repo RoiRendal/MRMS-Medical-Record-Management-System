@@ -6,6 +6,7 @@ const mongoose = require('mongoose');
 const healthRoute = require('./app/routes/health-routes');
 const authRoute = require('./app/routes/auth-routes');
 const accountRoute = require('./app/routes/account-routes');
+const doctorRoute = require('./app/routes/doctor-routes');
 const { errorHandler } = require('./app/middleware/errorHandler');
 
 const app = express();
@@ -20,6 +21,7 @@ const requestMapper = '/api';
 app.use(requestMapper, healthRoute);
 app.use(requestMapper, authRoute);
 app.use(requestMapper, accountRoute);
+app.use(requestMapper, doctorRoute);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'No such endpoint exists' });
