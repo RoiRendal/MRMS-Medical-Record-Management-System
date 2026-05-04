@@ -1,7 +1,7 @@
 {
   "name": "mrms",
   "version": "1.0.0",
-  "description": "Medical Record Management System: integrates via Adapter Layer and Auth service",
+  "description": "Medical Record Management System, integrates via Adapter Layer and Auth service",
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
