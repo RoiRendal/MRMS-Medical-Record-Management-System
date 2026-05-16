@@ -53,44 +53,109 @@ async function authRequest(path, options = {}) {
 
 async function login(credentials) {
   if (isMockMode()) {
-    if (credentials?.username === 'admin' && credentials?.password === 'admin123') {
+    if (credentials?.email === 'admin@gmail.com' && credentials?.password === 'Admin123@') {
       return {
+        message: 'Login successful',
         token: 'mock-token-admin',
         user: {
           id: 'staff-001',
+          email: 'admin@gmail.com',
           role: 'staff',
-          username: 'admin',
         },
       };
     }
     throw createPublicError('Invalid credentials', 401);
   }
 
-  return authRequest('/auth/login', {
+  // Auth system uses email + password, returns a message and sets httpOnly cookie
+  // We extract token from response or generate one for Bearer auth compatibility
+  const response = await authRequest('/auth/login', {
     method: 'POST',
-    body: JSON.stringify(credentials || {}),
+    body: JSON.stringify({
+      email: credentials?.email,
+      password: credentials?.password,
+    }),
+  });
+
+  // Auth system returns { message: "Login successful" } and sets cookie server-side
+  // For API clients, we need to return a token. Fetch the user info and create a Bearer token.
+  if (response?.message === 'Login successful') {
+    // Call /all endpoint to get user info (in production, should be /me or similar)
+    // For now, we'll call /auth/validate to get the current user
+    try {
+      // Re-login and extract user from response if available, or call /all to find user
+      const userResponse = await authRequest('/all', {
+        method: 'GET',
+      });
+      const user = Array.isArray(userResponse) ? userResponse.find(u => u.email === credentials?.email) : null;
+      if (user) {
+        // Generate a simple Bearer token for API clients
+        const token = `bearer_${user.id}_${Date.now()}`;
+        return {
+          message: response.message,
+          token,
+          user: {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+          },
+        };
+      }
+    } catch (err) {
+      // If we can't get user info, still return success but without token
+    }
+  }
+
+  return response;
+}
+
+async function register(payload) {
+  if (isMockMode()) {
+    if (!payload?.firstName || !payload?.lastName || !payload?.email || !payload?.password) {
+      throw createPublicError('firstName, lastName, email, and password are required', 400);
+    }
+    return {
+      message: 'User created',
+      user: {
+        id: `mock-patient-${Date.now()}`,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        role: 'patient',
+      },
+    };
+  }
+
+  return authRequest('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({
+      firstName: payload?.firstName,
+      lastName: payload?.lastName,
+      email: payload?.email,
+      password: payload?.password,
+    }),
   });
 }
 
 async function createUserAccount(payload) {
   if (isMockMode()) {
-    if (!payload?.username || !payload?.password || !payload?.role) {
-      throw createPublicError('username, password, and role are required', 400);
+    if (!payload?.firstName || !payload?.lastName || !payload?.email || !payload?.password) {
+      throw createPublicError('firstName, lastName, email, and password are required', 400);
     }
     return {
       message: 'Account created',
       user: {
-        id: `mock-${payload.role}-${Date.now()}`,
-        username: payload.username,
-        role: payload.role,
+        id: `mock-patient-${Date.now()}`,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        email: payload.email,
+        role: 'patient',
       },
     };
   }
 
-  return authRequest('/accounts', {
-    method: 'POST',
-    body: JSON.stringify(payload || {}),
-  });
+  // Use the Auth system's /auth/register endpoint
+  return register(payload);
 }
 
 async function assignRole(payload) {
@@ -155,6 +220,7 @@ module.exports = {
   getBaseUrl,
   isMockMode,
   login,
+  register,
   createUserAccount,
   assignRole,
   validateToken,
