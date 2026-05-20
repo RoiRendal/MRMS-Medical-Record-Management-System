@@ -1,5 +1,5 @@
 const adapterClient = require('../clients/adapterClient');
-const { requireFields, requireMongoObjectId } = require('../utils/validators');
+const { requireFields } = require('../utils/validators');
 
 async function createPatientProfile(req, res, next) {
   try {

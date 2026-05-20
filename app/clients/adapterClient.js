@@ -113,6 +113,10 @@ function normalizeAdapterResponse(data) {
   return data;
 }
 
+function buildAuthHeaders(token) {
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 function splitName(fullName = '') {
   const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
   return {
@@ -203,10 +207,12 @@ async function createPatientProfile(payload, token) {
     contactNumber: payload.phone,
   };
 
+  const authHeaders = buildAuthHeaders(token);
+
   const created = normalizeAdapterResponse(
     await adapterRequest('/patients/create', {
       method: 'POST',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
       body: JSON.stringify(adapterPayload || {}),
     })
   );
@@ -216,7 +222,7 @@ async function createPatientProfile(payload, token) {
     const fetched = normalizeAdapterResponse(
       await adapterRequest(`/patients/${patientId}`, {
         method: 'GET',
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: authHeaders,
       })
     );
     return formatBasicPatient(fetched);
@@ -239,7 +245,7 @@ async function getPatientProfiles(token) {
   const data = normalizeAdapterResponse(
     await adapterRequest('/patients', {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: buildAuthHeaders(token),
     })
   );
 
@@ -264,34 +270,39 @@ async function getPatientRecords(patientId, token) {
     };
   }
 
+  const authHeaders = buildAuthHeaders(token);
   const [patientResponse, consultationResponse, appointmentResponse, billingResponse] = await Promise.all([
     adapterRequest(`/patients/${patientId}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
     }),
     adapterRequest(`/consultation/history/${patientId}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
     }),
     adapterRequest(`/appointment/patient/${patientId}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
     }),
     adapterRequest(`/billing/history/${patientId}`, {
       method: 'GET',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: authHeaders,
     }),
   ]);
 
   const patient = formatBasicPatient(normalizeAdapterResponse(patientResponse));
-  const consultations = Array.isArray(normalizeAdapterResponse(consultationResponse))
-    ? normalizeAdapterResponse(consultationResponse).map(formatConsultation)
+  const consultationsData = normalizeAdapterResponse(consultationResponse);
+  const appointmentData = normalizeAdapterResponse(appointmentResponse);
+  const billingData = normalizeAdapterResponse(billingResponse);
+
+  const consultations = Array.isArray(consultationsData)
+    ? consultationsData.map(formatConsultation)
     : [];
-  const appointments = Array.isArray(normalizeAdapterResponse(appointmentResponse))
-    ? normalizeAdapterResponse(appointmentResponse).map(formatAppointment)
+  const appointments = Array.isArray(appointmentData)
+    ? appointmentData.map(formatAppointment)
     : [];
-  const billing = Array.isArray(normalizeAdapterResponse(billingResponse))
-    ? normalizeAdapterResponse(billingResponse).map(formatBilling)
+  const billing = Array.isArray(billingData)
+    ? billingData.map(formatBilling)
     : [];
 
   return {

@@ -9,8 +9,10 @@ const { requireStaffOrAdmin } = require('../middleware/requireAuth');
 
 const router = express.Router();
 
-router.post('/patients', requireStaffOrAdmin, createPatientProfile);
-router.get('/patients', requireStaffOrAdmin, getAllPatients);
+router.route('/patients')
+  .post(requireStaffOrAdmin, createPatientProfile)
+  .get(requireStaffOrAdmin, getAllPatients);
+
 router.get('/patients/:patientId/records', requireStaffOrAdmin, getPatientRecordsById);
 
 module.exports = router;
