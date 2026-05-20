@@ -1,8 +1,3 @@
-/**
- * HTTP client for the Adapter Layer (only path to legacy HAS data).
- * Phase 1: exposes configuration and a no-network health check; CRUD methods added with patient/doctor slices.
- */
-
 function getBaseUrl() {
   const url = (process.env.ADAPTER_BASE_URL || '').trim();
   return url.replace(/\/$/, '');

@@ -1,8 +1,3 @@
-/**
- * HTTP client for the Authentication & Authorization service.
- * Works in live mode or mock mode (default until Auth service is available).
- */
-
 function getBaseUrl() {
   const url = (process.env.AUTH_BASE_URL || '').trim();
   return url.replace(/\/$/, '');
@@ -67,8 +62,6 @@ async function login(credentials) {
     throw createPublicError('Invalid credentials', 401);
   }
 
-  // Auth system uses email + password, returns a message and sets httpOnly cookie
-  // We extract token from response or generate one for Bearer auth compatibility
   const response = await authRequest('/auth/login', {
     method: 'POST',
     body: JSON.stringify({
@@ -77,19 +70,13 @@ async function login(credentials) {
     }),
   });
 
-  // Auth system returns { message: "Login successful" } and sets cookie server-side
-  // For API clients, we need to return a token. Fetch the user info and create a Bearer token.
   if (response?.message === 'Login successful') {
-    // Call /all endpoint to get user info (in production, should be /me or similar)
-    // For now, we'll call /auth/validate to get the current user
     try {
-      // Re-login and extract user from response if available, or call /all to find user
       const userResponse = await authRequest('/all', {
         method: 'GET',
       });
       const user = Array.isArray(userResponse) ? userResponse.find(u => u.email === credentials?.email) : null;
       if (user) {
-        // Generate a simple Bearer token for API clients
         const token = `bearer_${user.id}_${Date.now()}`;
         return {
           message: response.message,
@@ -102,7 +89,6 @@ async function login(credentials) {
         };
       }
     } catch (err) {
-      // If we can't get user info, still return success but without token
     }
   }
 
@@ -154,7 +140,6 @@ async function createUserAccount(payload) {
     };
   }
 
-  // Use the Auth system's /auth/register endpoint
   return register(payload);
 }
 
