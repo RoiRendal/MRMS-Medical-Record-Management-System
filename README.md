@@ -614,7 +614,8 @@ Resource not found.
 
 ### Adapter Layer Integration
 - Patient operations (`POST /patients`, `GET /patients`, `GET /patients/:patientId/records`) route through Adapter Layer
-- Currently in mock mode; awaiting Group 2 (Adapter Layer) deployment
+- MRMS adapter client now normalizes adapter response wrappers and uses consistent auth headers for live adapter calls
+- Patient records are aggregated from adapter endpoints for patient profile, consultation history, appointment history, and billing history
 - Once Adapter is live, set `ADAPTER_BASE_URL` and `ADAPTER_USE_MOCK=false`
 
 ### Doctor Profile Management
@@ -632,8 +633,7 @@ Resource not found.
 | Patient/Doctor account creation | ✅ Fully functional | Delegates to Auth system |
 | Doctor role assignment | ✅ Implemented | Auto-promotes to 'doctor' role |
 | Unauthorized access prevention | ✅ Implemented | All endpoints protected |
-| Patient operations | ⏳ Ready (blocked) | Awaiting Adapter Layer deployment |
-| Token validation | ⏳ In progress | Mock mode enabled for testing |
+| Patient operations | ✅ Implemented | Awaiting Adapter Layer deployment; adapter integration logic cleaned up |
 
 ---
 
