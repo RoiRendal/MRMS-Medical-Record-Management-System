@@ -106,13 +106,76 @@ async function adapterRequest(path, options = {}) {
   return data;
 }
 
-function formatBasicPatient(patient) {
+function normalizeAdapterResponse(data) {
+  if (data && typeof data === 'object' && data.success === true && 'data' in data) {
+    return data.data;
+  }
+  return data;
+}
+
+function splitName(fullName = '') {
+  const parts = String(fullName).trim().split(/\s+/).filter(Boolean);
   return {
-    id: patient._id || patient.id,
-    name: patient.name || null,
-    birthdate: patient.birthdate || null,
-    address: patient.address || null,
-    phone: patient.phone || null,
+    firstName: parts[0] || null,
+    lastName: parts.slice(1).join(' ') || null,
+  };
+}
+
+function splitAddress(address = '') {
+  const [streetAddress, city] = String(address).split(',').map((part) => part.trim());
+  return {
+    streetAddress: streetAddress || null,
+    city: city || '',
+  };
+}
+
+function formatBasicPatient(patient) {
+  if (!patient || typeof patient !== 'object') return null;
+
+  const name = patient.name || [patient.firstName, patient.lastName].filter(Boolean).join(' ').trim();
+  const address = patient.address || [patient.streetAddress, patient.city].filter(Boolean).join(', ').trim();
+  const phone = patient.phone || patient.contactNumber || null;
+
+  return {
+    _id: patient._id || patient.id || patient.legacyId || patient.patientId || null,
+    name: name || null,
+    birthdate: patient.birthdate || patient.dob || null,
+    address: address || null,
+    phone,
+  };
+}
+
+function formatConsultation(record) {
+  return {
+    _id: record._id || record.consultationId || record.id || null,
+    patientId: record.patientId || null,
+    appointmentId: record.appointmentId || null,
+    doctorId: record.doctorId || null,
+    date: record.date || record.createdAt || null,
+    notes: record.notes || record.doctorNotes || record.clinicalFinding || null,
+    prescription: record.prescription || record.rx || null,
+  };
+}
+
+function formatAppointment(record) {
+  return {
+    _id: record._id || record.id || null,
+    patientId: record.patientId || null,
+    doctorId: record.doctorId || record.doctor || null,
+    dateTime: record.appointmentDate || record.date || null,
+    status: record.appointmentStatus || record.status || null,
+    department: record.department || record.dept || null,
+  };
+}
+
+function formatBilling(record) {
+  return {
+    _id: record._id || record.billingId || record.id || null,
+    patientId: record.patientId || null,
+    amount: record.amount != null ? Number(record.amount) : record.cost != null ? Number(record.cost) : null,
+    status: record.billingStatus || record.status || null,
+    date: record.date || record.dateIssued || record.issuedDate || null,
+    description: record.serviceDescription || record.description || null,
   };
 }
 
@@ -129,13 +192,43 @@ async function createPatientProfile(payload, token) {
     return formatBasicPatient(created);
   }
 
-  const data = await adapterRequest('/patients', {
-    method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: JSON.stringify(payload || {}),
-  });
+  const { firstName, lastName } = splitName(payload.name);
+  const { streetAddress, city } = splitAddress(payload.address);
+  const adapterPayload = {
+    firstName,
+    lastName,
+    dob: payload.birthdate,
+    streetAddress,
+    city,
+    contactNumber: payload.phone,
+  };
 
-  return formatBasicPatient(data);
+  const created = normalizeAdapterResponse(
+    await adapterRequest('/patients/create', {
+      method: 'POST',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: JSON.stringify(adapterPayload || {}),
+    })
+  );
+
+  const patientId = created?.legacyId || created?.id || created?._id;
+  if (patientId) {
+    const fetched = normalizeAdapterResponse(
+      await adapterRequest(`/patients/${patientId}`, {
+        method: 'GET',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+    );
+    return formatBasicPatient(fetched);
+  }
+
+  return formatBasicPatient({
+    _id: patientId || null,
+    name: payload.name,
+    birthdate: payload.birthdate,
+    address: payload.address,
+    phone: payload.phone,
+  });
 }
 
 async function getPatientProfiles(token) {
@@ -143,10 +236,12 @@ async function getPatientProfiles(token) {
     return mockPatients.map(formatBasicPatient);
   }
 
-  const data = await adapterRequest('/patients', {
-    method: 'GET',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const data = normalizeAdapterResponse(
+    await adapterRequest('/patients', {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
+  );
 
   if (!Array.isArray(data)) return [];
   return data.map(formatBasicPatient);
@@ -163,22 +258,47 @@ async function getPatientRecords(patientId, token) {
     }
     return {
       patient: formatBasicPatient(patient),
-      consultations: mockConsultations.filter((item) => item.patientId === patientId),
-      appointments: mockAppointments.filter((item) => item.patientId === patientId),
-      billing: mockBilling.filter((item) => item.patientId === patientId),
+      consultations: mockConsultations.filter((item) => item.patientId === patientId).map(formatConsultation),
+      appointments: mockAppointments.filter((item) => item.patientId === patientId).map(formatAppointment),
+      billing: mockBilling.filter((item) => item.patientId === patientId).map(formatBilling),
     };
   }
 
-  const data = await adapterRequest(`/patients/${patientId}/records`, {
-    method: 'GET',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
+  const [patientResponse, consultationResponse, appointmentResponse, billingResponse] = await Promise.all([
+    adapterRequest(`/patients/${patientId}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }),
+    adapterRequest(`/consultation/history/${patientId}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }),
+    adapterRequest(`/appointment/patient/${patientId}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }),
+    adapterRequest(`/billing/history/${patientId}`, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    }),
+  ]);
+
+  const patient = formatBasicPatient(normalizeAdapterResponse(patientResponse));
+  const consultations = Array.isArray(normalizeAdapterResponse(consultationResponse))
+    ? normalizeAdapterResponse(consultationResponse).map(formatConsultation)
+    : [];
+  const appointments = Array.isArray(normalizeAdapterResponse(appointmentResponse))
+    ? normalizeAdapterResponse(appointmentResponse).map(formatAppointment)
+    : [];
+  const billing = Array.isArray(normalizeAdapterResponse(billingResponse))
+    ? normalizeAdapterResponse(billingResponse).map(formatBilling)
+    : [];
 
   return {
-    patient: data?.patient ? formatBasicPatient(data.patient) : null,
-    consultations: Array.isArray(data?.consultations) ? data.consultations : [],
-    appointments: Array.isArray(data?.appointments) ? data.appointments : [],
-    billing: Array.isArray(data?.billing) ? data.billing : [],
+    patient,
+    consultations,
+    appointments,
+    billing,
   };
 }
 

@@ -28,7 +28,7 @@ async function getAllPatients(req, res, next) {
 async function getPatientRecordsById(req, res, next) {
   try {
     const { patientId } = req.params;
-    requireMongoObjectId(patientId, 'patientId');
+    requireFields(req.params, ['patientId']);
 
     const records = await adapterClient.getPatientRecords(patientId, req.token);
     res.status(200).json(records);
